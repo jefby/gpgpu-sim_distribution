@@ -767,6 +767,7 @@ enum cache_operator_type {
   CACHE_WRITE_THROUGH  // .wt
 };
 
+// 从warp合并后的内存地址
 class mem_access_t {
  public:
   mem_access_t(gpgpu_context *ctx) { init(ctx); }

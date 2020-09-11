@@ -249,6 +249,7 @@ struct sector_cache_block : public cache_block_t {
     // allocate a new line
     // assert(m_block_addr != 0 && m_block_addr != block_addr);
     init();
+    printf("===== jefby allocate_line cache tag %llx block_addr %llx\n", tag, block_addr);
     m_tag = tag;
     m_block_addr = block_addr;
 
@@ -546,11 +547,13 @@ class cache_config {
         exit_parse_error();
     }
     if (m_alloc_policy == STREAMING) {
+        //　目前实现方法是设置alloc policy为ON_FILL，且设置MSHR数量等于最大可分配的cache line数量
+        //　对每个cache line都关联一个MSHR
       // For streaming cache, we set the alloc policy to be on-fill to remove
       // all line_alloc_fail stalls we set the MSHRs to be equal to max
       // allocated cache lines. This is possible by moving TAG to be shared
       // between cache line and MSHR enrty (i.e. for each cache line, there is
-      // an MSHR rntey associated with it) This is the easiest think we can
+      // an MSHR entry associated with it) This is the easiest think we can
       // think about to model (mimic) L1 streaming cache in Pascal and Volta
       // Based on our microbenchmakrs, MSHRs entries have been increasing
       // substantially in Pascal and Volta For more information about streaming
@@ -559,8 +562,11 @@ class cache_config {
       // https://ieeexplore.ieee.org/document/8344474/
       m_is_streaming = true;
       m_alloc_policy = ON_FILL;
+      // MAX_DEFAULT_CACHE_SIZE_MULTIBLIER=4
       m_mshr_entries = m_nset * m_assoc * MAX_DEFAULT_CACHE_SIZE_MULTIBLIER;
+      // SECTOR_CHUNCK_SIZE=4
       if (m_cache_type == SECTOR) m_mshr_entries *= SECTOR_CHUNCK_SIZE;
+      //　最大合并数量1<<6=64
       m_mshr_max_merge = MAX_WARP_PER_SM;
     }
     switch (mshr_type) {
@@ -610,6 +616,7 @@ class cache_config {
     }
 
     // detect invalid configuration
+    //　所以volta的DL2 cache中因为write_policy=write_back，m_alloc_policy=ON_MISS
     if (m_alloc_policy == ON_FILL and m_write_policy == WRITE_BACK) {
       // A writeback cache with allocate-on-fill policy will inevitably lead to
       // deadlock: The deadlock happens when an incoming cache-fill evicts a
@@ -632,6 +639,7 @@ class cache_config {
           "Invalid cache configuration: FETCH_ON_WRITE and LAZY_FETCH_ON_READ "
           "cannot work properly with ON_FILL policy. Cache must be ON_MISS. ");
     }
+    // 检查line_size是否等于128B=4*SECTOR_SIZE
     if (m_cache_type == SECTOR) {
       assert(m_line_sz / SECTOR_SIZE == SECTOR_CHUNCK_SIZE &&
              m_line_sz % SECTOR_SIZE == 0);
@@ -691,7 +699,7 @@ class cache_config {
   unsigned hash_function(new_addr_type addr, unsigned m_nset,
                          unsigned m_line_sz_log2, unsigned m_nset_log2,
                          unsigned m_index_function) const;
-
+  //　这个其实只是返回block地址（将内存地址按照linesize进行划分）
   new_addr_type tag(new_addr_type addr) const {
     // For generality, the tag includes both index and tag. This allows for more
     // complex set index calculations that can result in different indexes
@@ -704,6 +712,8 @@ class cache_config {
   new_addr_type block_addr(new_addr_type addr) const {
     return addr & ~(new_addr_type)(m_line_sz - 1);
   }
+
+  // Volta以后都是SECTOR_SIZE=32，也就是将内存地址按照32B进行划分
   new_addr_type mshr_addr(new_addr_type addr) const {
     return addr & ~(new_addr_type)(m_atom_sz - 1);
   }
@@ -712,6 +722,7 @@ class cache_config {
     // set new assoc. L1 cache dynamically resized in Volta
     m_assoc = n;
   }
+  // cache被划分成多少组
   unsigned get_nset() const {
     assert(m_valid);
     return m_nset;

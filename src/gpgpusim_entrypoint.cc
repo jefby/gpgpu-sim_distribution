@@ -72,6 +72,7 @@ static void termination_callback() {
   fflush(stdout);
 }
 
+//　ptx方式默认入口函数
 void *gpgpu_sim_thread_concurrent(void *ctx_ptr) {
   gpgpu_context *ctx = (gpgpu_context *)ctx_ptr;
   atexit(termination_callback);

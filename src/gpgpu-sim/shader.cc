@@ -47,11 +47,13 @@
 #include "stat-tool.h"
 #include "traffic_breakdown.h"
 #include "visualizer.h"
+#include <iostream>
 
 #define PRIORITIZE_MSHR_OVER_WB 1
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
+// 内存请求结构，会传给cache model和内存子系统
 mem_fetch *shader_core_mem_fetch_allocator::alloc(
     new_addr_type addr, mem_access_type type, unsigned size, bool wr,
     unsigned long long cycle) const {
@@ -985,7 +987,7 @@ void exec_shader_core_ctx::func_exec_inst(warp_inst_t &inst) {
   execute_warp_inst_t(inst);
   if (inst.is_load() || inst.is_store()) {
     inst.generate_mem_accesses();
-    // inst.print_m_accessq();
+    inst.print_m_accessq();
   }
 }
 
@@ -1875,6 +1877,7 @@ mem_stage_stall_type ldst_unit::process_memory_access_queue_l1cache(
 
       if ((l1_latency_queue[bank_id][m_config->m_L1D_config.l1_latency - 1]) ==
           NULL) {
+          
         l1_latency_queue[bank_id][m_config->m_L1D_config.l1_latency - 1] = mf;
 
         if (mf->get_inst().is_store()) {
@@ -3257,6 +3260,8 @@ unsigned int shader_core_config::max_cta(const kernel_info_t &k) const {
     abort();
   }
 
+  // jefby
+  // 如果是设置了adaptive_cache_config，这里需要类似cuda driver进行相应处理
   if (adaptive_cache_config && !k.cache_config_set) {
     // For more info about adaptive cache, see
     // https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#shared-memory-7-x
@@ -3269,6 +3274,7 @@ unsigned int shader_core_config::max_cta(const kernel_info_t &k) const {
         case FIXED:
           break;
         case ADAPTIVE_VOLTA: {
+          //　xavier可以复用这个逻辑
           // For Volta, we assign the remaining shared memory to L1 cache
           // For more info about adaptive cache, see
           // https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#shared-memory-7-x

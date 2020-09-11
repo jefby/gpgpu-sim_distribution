@@ -465,7 +465,7 @@ void warp_inst_t::generate_mem_accesses() {
   }
   m_mem_accesses_created = true;
 }
-
+//　这个地方就是所说的访存合并了
 void warp_inst_t::memory_coalescing_arch(bool is_write,
                                          mem_access_type access_type) {
   // see the CUDA manual where it discusses coalescing rules before reading this
@@ -486,6 +486,7 @@ void warp_inst_t::memory_coalescing_arch(bool is_write,
     sector_segment_size = true;
   }
 
+  //　指令中操作数的size，what is the size of the word being operated on?
   switch (data_size) {
     case 1:
       segment_size = 32;
@@ -499,6 +500,7 @@ void warp_inst_t::memory_coalescing_arch(bool is_write,
       segment_size = sector_segment_size ? 32 : 128;
       break;
   }
+  //　默认warp_parts是1
   unsigned subwarp_size = m_config->warp_size / warp_parts;
 
   for (unsigned subwarp = 0; subwarp < warp_parts; subwarp++) {
@@ -530,10 +532,13 @@ void warp_inst_t::memory_coalescing_arch(bool is_write,
            (m_per_scalar_thread[thread].memreqaddr[access] != 0);
            access++) {
         new_addr_type addr = m_per_scalar_thread[thread].memreqaddr[access];
+        printf("=========== jefby memory_coalescing_arch addr %llx \n", addr);
         unsigned block_address = line_size_based_tag_func(addr, segment_size);
         unsigned chunk =
             (addr & 127) / 32;  // which 32-byte chunk within in a 128-byte
                                 // chunk does this thread access?
+        // 根据block_address进行索引，保存对应的chunk addr和thread 信息
+        // chunk addr表示128B里面到底是哪一个32B
         transaction_info &info = subwarp_transactions[block_address];
 
         // can only write to one segment
